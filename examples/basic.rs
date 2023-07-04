@@ -4,16 +4,27 @@ use ggca::correlation::CorrelationMethod;
 use pyo3::PyResult;
 use std::time::Instant;
 
+// Datasets's paths
+const GENE_SMALL_FILE_PATH: &str = "tests/small_files/mRNA.csv"; // mRNA = 600 rows
+const GEM_SMALL_FILE_PATH: &str = "tests/small_files/miRNA.csv"; // miRNA = 299 rows
+
+const GENE_METHYLATION_FILE_PATH: &str = "tests/medium_files/methylation_gene.csv"; // mRNA = 41 rows
+const METHYLATION_FILE_PATH: &str = "tests/medium_files/methylation_gem.csv"; // miRNA = 1505 rows
+
+
 fn main() -> PyResult<()> {
+
+    pyo3::prepare_freethreaded_python();
+
     // Datasets's paths
-    let gene_file_path = "mrna.csv".to_string();
-    let gem_file_path = "mirna.csv".to_string();
+    let gene_file_path = GENE_SMALL_FILE_PATH.to_string();
+    let gem_file_path = GEM_SMALL_FILE_PATH.to_string();
 
     // Some parameters
-    let gem_contains_cpg = false;
+    let gem_contains_cpg = false;       // false en small, true en methylation
     let is_all_vs_all = true;
-    let keep_top_n = Some(10); // Keeps the top 10 of correlation (sorting by abs values)
-    let collect_gem_dataset = None; // Better performance. Keep small GEM files in memory
+    let keep_top_n = None;
+    let collect_gem_dataset = Some(false);  // false = disk (slow), true = ram, or none
 
     let now = Instant::now();
 
@@ -23,7 +34,7 @@ fn main() -> PyResult<()> {
         gem_file_path,
         gem_contains_cpg,
         correlation_method: CorrelationMethod::Pearson,
-        correlation_threshold: 0.7,
+        correlation_threshold: 0.0,
         sort_buf_size: 2_000_000,
         adjustment_method: AdjustmentMethod::BenjaminiHochberg,
         is_all_vs_all,
@@ -34,13 +45,17 @@ fn main() -> PyResult<()> {
     let (result, _total_combinations_count, number_of_combinations_evaluated) =
         analysis.compute()?;
 
-    let seconds = now.elapsed().as_secs();
+    let milliseconds = now.elapsed().as_millis();
 
-    for cor_p_value in result.iter() {
-        println!("{}", cor_p_value);
+    // print results only if it isn't too much
+    if result.len() < 4 {
+        for cor_p_value in result.iter() {
+            println!("{}", cor_p_value);
+        }
     }
 
-    println!("Finished in -> {} seconds", seconds);
+    println!("Finished in -> {} ms", milliseconds);
+
     println!(
         "Number of elements -> {} of {} combinations evaluated",
         result.len(),
