@@ -4,27 +4,41 @@ use ggca::correlation::CorrelationMethod;
 use pyo3::PyResult;
 use std::time::Instant;
 
-// Datasets's paths
-const GENE_SMALL_FILE_PATH: &str = "tests/small_files/mRNA.csv"; // mRNA = 600 rows
-const GEM_SMALL_FILE_PATH: &str = "tests/small_files/miRNA.csv"; // miRNA = 299 rows
-
-const GENE_METHYLATION_FILE_PATH: &str = "tests/medium_files/methylation_gene.csv"; // mRNA = 41 rows
-const METHYLATION_FILE_PATH: &str = "tests/medium_files/methylation_gem.csv"; // miRNA = 1505 rows
-
+// dataset struct
+struct DatasetData {
+    gene_path: String,
+    gem_path: String,
+    gem_contains_cpg: bool
+}
 
 fn main() -> PyResult<()> {
 
     pyo3::prepare_freethreaded_python();
 
+    // datasets
+    let small_dataset = DatasetData {
+        gene_path: "tests/small_files/mRNA.csv".to_string(),
+        gem_path: "tests/small_files/miRNA.csv".to_string(),
+        gem_contains_cpg: false
+    };
+
+    let _methylation_dataset = DatasetData {
+        gene_path: "tests/medium_files/methylation_gene.csv".to_string(),
+        gem_path: "tests/medium_files/methylation_gem.csv".to_string(),
+        gem_contains_cpg: true
+    };
+
+    let dataset_chosen = small_dataset;
+
     // Datasets's paths
-    let gene_file_path = GENE_SMALL_FILE_PATH.to_string();
-    let gem_file_path = GEM_SMALL_FILE_PATH.to_string();
+    let gene_file_path = dataset_chosen.gene_path;
+    let gem_file_path = dataset_chosen.gem_path;
 
     // Some parameters
-    let gem_contains_cpg = false;       // false en small, true en methylation
+    let gem_contains_cpg = dataset_chosen.gem_contains_cpg;       
     let is_all_vs_all = true;
     let keep_top_n = None;
-    let collect_gem_dataset = Some(false);  // false = disk (slow), true = ram, or none
+    let collect_gem_dataset = Some(true);  // false = disk (slow), true = ram, or none
 
     let now = Instant::now();
 
