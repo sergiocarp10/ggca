@@ -11,7 +11,6 @@ use log::warn;
 // Do not remove, it's used for tee()
 use pyo3::{create_exception, prelude::*};
 use std::fs;
-use std::time::Instant;
 
 create_exception!(ggca, GGCADiffSamplesLength, pyo3::exceptions::PyException);
 create_exception!(ggca, GGCADiffSamples, pyo3::exceptions::PyException);
@@ -154,10 +153,6 @@ impl Analysis {
         should_collect_gem_dataset: bool,
     ) -> PyResult<(VecOfResults, usize, usize)> {
 
-        let now = Instant::now();
-
-        println!("{} ms: definiendo funcion y metodo de correlacion", now.elapsed().as_millis());
-
         // Cartesian product computing correlation and p-value (two-sided)
         let correlation_method_struct = get_correlation_method(&self.correlation_method, number_of_samples);
         
@@ -166,8 +161,6 @@ impl Analysis {
         } else {
             cartesian_equal_genes
         };
-
-        println!("{} ms: realizando producto cruz entre datasets (solo ram)", now.elapsed().as_millis());
 
         // Right part of iproduct must implement Clone. For more info read:
         // https://users.rust-lang.org/t/iterators-over-csv-files-with-iproduct/51947
@@ -181,13 +174,9 @@ impl Analysis {
             Box::new(self.cartesian_product(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
         };
 
-        println!("{} ms: realizando correlaciones y p-valores", now.elapsed().as_millis());
-
         let correlations_and_p_values = cross_product.map(|(tuple_1, tuple_2)| {
             correlation_function(tuple_1, tuple_2, &*correlation_method_struct)
         });
-
-        println!("{} ms: filtrando genes iguales y valores NaN", now.elapsed().as_millis());
 
         // Filtering by equal genes (if needed) and NaN values
         let mut nan_errors = ConstantInputError::new();
@@ -203,16 +192,9 @@ impl Analysis {
             Box::new(filtered_nan)
         };
 
-        println!("{} ms: realizando filtered.tee()", now.elapsed().as_millis());
-
         // Counts element for future p-value adjustment
         let (filtered, filtered_aux) = filtered.tee();
-        
-        println!("{} ms: contando combinaciones evaluadas", now.elapsed().as_millis());
-        
         let number_of_evaluated_combinations = filtered_aux.count();
-
-        println!("{} ms: ordenando...", now.elapsed().as_millis());
 
         // Sorting (for future adjustment). Note: consumes iterator
         let sorted: Box<dyn Iterator<Item = CorResult>> = match self.adjustment_method {
@@ -230,8 +212,6 @@ impl Analysis {
                 })?)
             }
         };
-
-        println!("{} ms: ranking and adjustment...", now.elapsed().as_millis());
 
         // Ranking
         let ranked = sorted.enumerate();
@@ -285,9 +265,6 @@ impl Analysis {
             };
 
         let result = limited.collect::<VecOfResults>();
-
-        println!("{} ms: fin analisis", now.elapsed().as_millis());
-        //println!("combinaciones evaluadas: {} de {}", number_of_evaluated_combinations, total_combinations_count);
 
         // Generates warnings if needed
         nan_errors.warn_if_needed();
