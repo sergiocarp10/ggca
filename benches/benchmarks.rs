@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
 };
@@ -96,25 +98,39 @@ fn bench_group(
 }
 
 pub fn ggca_benchmarks(c: &mut Criterion) {
+
     // Test small files without CpG Site IDs
     let mut group_small = c.benchmark_group("Small mRNA/miRNA files");
+    let mut now = Instant::now();
+
     bench_group(
         GENE_SMALL_FILE_PATH,
         GEM_SMALL_FILE_PATH,
         false,
         &mut group_small,
     );
+
+    let dur1 = now.elapsed().as_secs();
     group_small.finish();
 
     // Test small files with CpG Site IDs
     let mut group_methylation = c.benchmark_group("Small mRNA/Methy. (CpG) files");
+    
+    now = Instant::now();
+    
     bench_group(
         GENE_METHYLATION_FILE_PATH,
         METHYLATION_FILE_PATH,
         true,
         &mut group_methylation,
     );
+
+    let dur2 = now.elapsed().as_secs();
     group_methylation.finish();
+
+    println!("Duración del bench small completo: {} segundos", dur1);
+    println!("Duración del bench methylation completo: {} segundos", dur2);
+
 }
 
 criterion_group!(benches, ggca_benchmarks);
