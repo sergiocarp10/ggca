@@ -5,3 +5,7 @@ pub type VecOfResults = Vec<CorResult>;
 pub type TupleExpressionValues = (String, Option<String>, Vec<f64>);
 pub type LazyMatrixInner = Box<dyn Iterator<Item = TupleExpressionValues>>;
 pub type CollectedMatrix = Vec<TupleExpressionValues>;
+
+
+// New types
+pub type FilteredResults = Box<dyn Iterator<Item = CorResult>>;

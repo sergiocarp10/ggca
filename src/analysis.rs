@@ -1,6 +1,6 @@
 extern crate extsort;
 use crate::dataset::{Dataset, GGCAError};
-use crate::types::{CollectedMatrix, TupleExpressionValues, VecOfResults};
+use crate::types::{CollectedMatrix, TupleExpressionValues, VecOfResults, FilteredResults};
 use crate::{
     adjustment::{get_adjustment_method, AdjustmentMethod},
     correlation::{get_correlation_method, CorResult, Correlation, CorrelationMethod},
@@ -10,6 +10,7 @@ use itertools::Itertools;
 use log::warn;
 // Do not remove, it's used for tee()
 use pyo3::{create_exception, prelude::*};
+use rayon::prelude::{IntoParallelRefIterator, IntoParallelIterator, ParallelIterator, IndexedParallelIterator};
 use std::fs;
 use std::time::Instant;
 
@@ -152,7 +153,7 @@ impl Analysis {
         dataset_1: Dataset, 
         dataset_2: Dataset,
         number_of_samples: usize
-    ) -> Box<dyn Iterator<Item = CorResult>> {
+    ) -> FilteredResults {
         let correlation_function = if self.is_all_vs_all {
             cartesian_all_vs_all
         } else {
@@ -163,8 +164,6 @@ impl Analysis {
         let correlation_method_struct = get_correlation_method(&self.correlation_method, number_of_samples);
 
         let mut nan_errors = ConstantInputError::new();
-
-        // FIN DE DEFINICION DE VARIABLES
 
         // Right part of iproduct must implement Clone. For more info read:
         // https://users.rust-lang.org/t/iterators-over-csv-files-with-iproduct/51947
@@ -177,12 +176,19 @@ impl Analysis {
         } else {
             Box::new(self.cartesian_product(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
         };
-        
-        let correlations_and_p_values = cross_product.map(move |(tuple_1, tuple_2)| {
-            correlation_function(tuple_1, tuple_2, &*correlation_method_struct)
+
+        let items = cross_product.collect_vec();
+        let cross_product = items.into_par_iter();
+
+        // This is the main CPU-Bound function
+        let correlations_and_p_values = cross_product.map(|(t1, t2)| {
+            correlation_function(t1, t2, &*correlation_method_struct)
         });
 
-        let filtered: Box<dyn Iterator<Item = CorResult>> = if self.is_all_vs_all {
+        let items: Vec<CorResult> = correlations_and_p_values.collect();
+        let correlations_and_p_values = items.into_iter();
+
+        let filtered: FilteredResults = if self.is_all_vs_all {
             let filtered_nan = correlations_and_p_values
                 .filter(move |cor_result| !nan_errors.p_value_is_nan(cor_result));
             Box::new(filtered_nan)
@@ -208,16 +214,16 @@ impl Analysis {
     ) -> PyResult<(VecOfResults, usize, usize)> {
 
         let t0 = Instant::now();
+        let filtered: FilteredResults = self.run_etapa1(should_collect_gem_dataset, dataset_1, dataset_2, number_of_samples);
 
         // Counts element for future p-value adjustment
-        let filtered = self.run_etapa1(should_collect_gem_dataset, dataset_1, dataset_2, number_of_samples);
         let (filtered, filtered_aux) = filtered.tee();
         let number_of_evaluated_combinations = filtered_aux.count();
 
         let t1 = t0.elapsed().as_millis();
 
         // Sorting (for future adjustment). Note: consumes iterator
-        let sorted: Box<dyn Iterator<Item = CorResult>> = match self.adjustment_method {
+        let sorted: FilteredResults = match self.adjustment_method {
             AdjustmentMethod::Bonferroni => Box::new(filtered),
             _ => {
                 // Benjamini-Hochberg and Benjamini-Yekutieli needs sort by p-value (descending order) to
