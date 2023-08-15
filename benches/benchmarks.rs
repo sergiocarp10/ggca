@@ -83,7 +83,7 @@ fn bench_group(
                                         adjustment_method: (*adjustment_method).clone(),
                                         is_all_vs_all: true,
                                         collect_gem_dataset: Some(*collect_gem_in_ram),
-                                        keep_top_n: *keep_top_n,
+                                        keep_top_n: *keep_top_n
                                     }
                                     .compute()
                                     .unwrap();

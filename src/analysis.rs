@@ -11,6 +11,7 @@ use log::warn;
 // Do not remove, it's used for tee()
 use pyo3::{create_exception, prelude::*};
 use std::fs;
+use std::time::Instant;
 
 create_exception!(ggca, GGCADiffSamplesLength, pyo3::exceptions::PyException);
 create_exception!(ggca, GGCADiffSamples, pyo3::exceptions::PyException);
@@ -128,7 +129,7 @@ pub struct Analysis {
     /// True to make the GEM dataset available in memory. This has a HUGE impact in analysis performance. Specify a boolean value to force or use None to allocate in memory automatically when GEM dataset size is small (<= 100MB)
     pub collect_gem_dataset: Option<bool>,
     /// Specify a number of results to keep or None to return all the resulting combinations
-    pub keep_top_n: Option<usize>,
+    pub keep_top_n: Option<usize>
 }
 
 impl Analysis {
@@ -145,22 +146,25 @@ impl Analysis {
         i.cartesian_product(j.into_iter())
     }
 
-    fn run_analysis(
-        &self,
-        dataset_1: Dataset,
+    fn run_etapa1(
+        &self, 
+        should_collect_gem_dataset: bool, 
+        dataset_1: Dataset, 
         dataset_2: Dataset,
-        number_of_samples: usize,
-        should_collect_gem_dataset: bool,
-    ) -> PyResult<(VecOfResults, usize, usize)> {
-
-        // Cartesian product computing correlation and p-value (two-sided)
-        let correlation_method_struct = get_correlation_method(&self.correlation_method, number_of_samples);
-        
+        number_of_samples: usize
+    ) -> Box<dyn Iterator<Item = CorResult>> {
         let correlation_function = if self.is_all_vs_all {
             cartesian_all_vs_all
         } else {
             cartesian_equal_genes
         };
+
+        // Cartesian product computing correlation and p-value (two-sided)
+        let correlation_method_struct = get_correlation_method(&self.correlation_method, number_of_samples);
+
+        let mut nan_errors = ConstantInputError::new();
+
+        // FIN DE DEFINICION DE VARIABLES
 
         // Right part of iproduct must implement Clone. For more info read:
         // https://users.rust-lang.org/t/iterators-over-csv-files-with-iproduct/51947
@@ -173,28 +177,44 @@ impl Analysis {
         } else {
             Box::new(self.cartesian_product(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
         };
-
-        let correlations_and_p_values = cross_product.map(|(tuple_1, tuple_2)| {
+        
+        let correlations_and_p_values = cross_product.map(move |(tuple_1, tuple_2)| {
             correlation_function(tuple_1, tuple_2, &*correlation_method_struct)
         });
 
-        // Filtering by equal genes (if needed) and NaN values
-        let mut nan_errors = ConstantInputError::new();
-
         let filtered: Box<dyn Iterator<Item = CorResult>> = if self.is_all_vs_all {
             let filtered_nan = correlations_and_p_values
-                .filter(|cor_result| !nan_errors.p_value_is_nan(cor_result));
+                .filter(move |cor_result| !nan_errors.p_value_is_nan(cor_result));
             Box::new(filtered_nan)
         } else {
-            let filtered_nan = correlations_and_p_values.filter(|cor_result| {
+            let filtered_nan = correlations_and_p_values.filter(move |cor_result| {
                 cor_result.gene == cor_result.gem && !nan_errors.p_value_is_nan(cor_result)
             });
             Box::new(filtered_nan)
         };
 
+        // Generates warnings if needed
+        //nan_errors.warn_if_needed();
+
+        filtered
+    }
+
+    fn run_analysis(
+        &self,
+        dataset_1: Dataset,
+        dataset_2: Dataset,
+        number_of_samples: usize,
+        should_collect_gem_dataset: bool,
+    ) -> PyResult<(VecOfResults, usize, usize)> {
+
+        let t0 = Instant::now();
+
         // Counts element for future p-value adjustment
+        let filtered = self.run_etapa1(should_collect_gem_dataset, dataset_1, dataset_2, number_of_samples);
         let (filtered, filtered_aux) = filtered.tee();
         let number_of_evaluated_combinations = filtered_aux.count();
+
+        let t1 = t0.elapsed().as_millis();
 
         // Sorting (for future adjustment). Note: consumes iterator
         let sorted: Box<dyn Iterator<Item = CorResult>> = match self.adjustment_method {
@@ -264,10 +284,10 @@ impl Analysis {
                 None => (Box::new(filtered), number_of_evaluated_combinations),
             };
 
+        let t2 = t0.elapsed().as_millis();
         let result = limited.collect::<VecOfResults>();
 
-        // Generates warnings if needed
-        nan_errors.warn_if_needed();
+        println!("dt1 = {} ms; dt2 = {} ms", t1, t2 - t1);
 
         Ok((
             result,
