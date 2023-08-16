@@ -6,12 +6,13 @@ use crate::{
     correlation::{get_correlation_method, CorResult, Correlation, CorrelationMethod},
 };
 use extsort::ExternalSorter;
-use itertools::Itertools;
+use itertools::{Itertools, iproduct};
 use log::warn;
 // Do not remove, it's used for tee()
 use pyo3::{create_exception, prelude::*};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator, IntoParallelRefIterator};
 use std::fs;
+use std::sync::Mutex;
 use std::time::Instant;
 
 create_exception!(ggca, GGCADiffSamplesLength, pyo3::exceptions::PyException);
@@ -76,21 +77,22 @@ fn cartesian_equal_genes(
 
 /// Independent struct to log warnings in case some combinations are filtered
 struct ConstantInputError {
-    number_of_cor_filtered: usize,
+    number_of_cor_filtered: Mutex<usize>,
 }
 
 impl ConstantInputError {
     fn new() -> Self {
         let _ = env_logger::try_init(); // To log warnings
         ConstantInputError {
-            number_of_cor_filtered: 0,
+            number_of_cor_filtered: Mutex::new(0),
         }
     }
 
     /// Checks if p-value is NaN
-    fn p_value_is_nan(&mut self, cor_result: &CorResult) -> bool {
+    fn p_value_is_nan(&self, cor_result: &CorResult) -> bool {
         if cor_result.p_value.unwrap().is_nan() {
-            self.number_of_cor_filtered += 1;
+            *self.number_of_cor_filtered.lock().unwrap() += 1;
+            //self.number_of_cor_filtered += 1;
             true
         } else {
             false
@@ -98,11 +100,11 @@ impl ConstantInputError {
     }
 
     /// Logs a warning indicating (if needed) that some correlations were filtered
-    fn warn_if_needed(&mut self) {
-        if self.number_of_cor_filtered > 0 {
+    fn warn_if_needed(&self) {
+        if self.number_of_cor_filtered.lock().unwrap().gt(&0) {
             warn!(
                 "{} combinations produced NaNs values as an input array is constant. The correlation coefficient is not defined so that/those combination/s were be filtered.",
-                self.number_of_cor_filtered
+                self.number_of_cor_filtered.lock().unwrap()
             );
         }
     }
@@ -173,7 +175,8 @@ impl Analysis {
         should_collect_gem_dataset: bool, 
         dataset_1: Dataset, 
         dataset_2: Dataset,
-        number_of_samples: usize
+        number_of_samples: usize,
+        nan_errors: &ConstantInputError
     ) -> FilteredResults {
         let correlation_function = if self.is_all_vs_all {
             cartesian_all_vs_all
@@ -184,8 +187,7 @@ impl Analysis {
         // Cartesian product computing correlation and p-value (two-sided)
         let correlation_method_struct = get_correlation_method(&self.correlation_method, number_of_samples);
 
-        let mut nan_errors = ConstantInputError::new();
-
+        // UNCOMMENT FOR OPT-2
         let d1: CollectedMatrix = dataset_1.lazy_matrix.collect_vec();
         let d2: CollectedMatrix = dataset_2.lazy_matrix.collect_vec();
         let cross_product = self.cartesian_product_par(d1, d2);
@@ -198,9 +200,8 @@ impl Analysis {
             Box::new(iproduct!(dataset_1.lazy_matrix, dataset_2.lazy_matrix.collect::<CollectedMatrix>()))
         } else {
             Box::new(iproduct!(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
-        }; */
-
-        //let items = cross_product.collect_vec();
+        };
+        let cross_product = cross_product.collect_vec(); */
 
         // This is the main CPU-Bound function
         let correlations_and_p_values = cross_product
@@ -209,24 +210,21 @@ impl Analysis {
             correlation_function(t1, t2, &*correlation_method_struct)
         });
 
-        let items: Vec<CorResult> = correlations_and_p_values.collect();
-        let correlations_and_p_values = items.into_iter();
+        //let items: Vec<CorResult> = correlations_and_p_values.collect();
+        //let correlations_and_p_values = items.into_iter();
 
-        let filtered: FilteredResults = if self.is_all_vs_all {
+        let filtered: Box<VecOfResults> = if self.is_all_vs_all {
             let filtered_nan = correlations_and_p_values
                 .filter(move |cor_result| !nan_errors.p_value_is_nan(cor_result));
-            Box::new(filtered_nan)
+            Box::new(filtered_nan.collect())
         } else {
             let filtered_nan = correlations_and_p_values.filter(move |cor_result| {
                 cor_result.gene == cor_result.gem && !nan_errors.p_value_is_nan(cor_result)
             });
-            Box::new(filtered_nan)
+            Box::new(filtered_nan.collect())
         };
 
-        // Generates warnings if needed
-        //nan_errors.warn_if_needed();
-
-        filtered
+        Box::new(filtered.into_iter())
     }
 
     fn run_analysis(
@@ -237,8 +235,14 @@ impl Analysis {
         should_collect_gem_dataset: bool,
     ) -> PyResult<(VecOfResults, usize, usize)> {
 
+        let nan_errors = ConstantInputError::new();
+
         let t0 = Instant::now();
-        let filtered: FilteredResults = self.run_etapa1(should_collect_gem_dataset, dataset_1, dataset_2, number_of_samples);
+        let filtered: FilteredResults = self.run_etapa1(
+            should_collect_gem_dataset, 
+            dataset_1, dataset_2, number_of_samples,
+            &nan_errors
+        );
 
         // Counts element for future p-value adjustment
         let (filtered, filtered_aux) = filtered.tee();
@@ -319,8 +323,8 @@ impl Analysis {
 
         println!("dt1 = {} ms; dt2 = {} ms", t1, t2 - t1);
 
-        // TEST
-        //self.cartesian_product_par(vec![1,2], vec![3,4]);
+        // Generates warnings if needed
+        nan_errors.warn_if_needed();
 
         Ok((
             result,

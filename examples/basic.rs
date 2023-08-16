@@ -64,19 +64,24 @@ fn do_analysis(dataset_chosen: &DatasetData, adj_method: AdjustmentMethod) -> Py
 
     let now = Instant::now();
 
-    let (result, _total_combinations_count, number_of_combinations_evaluated) =
+    let (mut result, mut _total_combinations_count, mut number_of_combinations_evaluated) = (vec![], 0, 0);
+
+    // repeat 10 times
+    for _ in 0..10 {
+        (result, _total_combinations_count, number_of_combinations_evaluated) =
         analysis.compute()?;
+    }
 
     let milliseconds = now.elapsed().as_millis();
 
-    // print results only if it isn't too much
+    /*
     if result.len() < 4 {
         for cor_p_value in result.iter() {
             println!("{}", cor_p_value);
         }
-    }
+    } */
 
-    println!("Finished in -> {} ms", milliseconds);
+    println!("Finished in -> {} ms; average {} ms", milliseconds, milliseconds / 10);
 
     println!(
         "Number of elements -> {} of {} combinations evaluated",
