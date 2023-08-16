@@ -6,11 +6,12 @@ use crate::{
     correlation::{get_correlation_method, CorResult, Correlation, CorrelationMethod},
 };
 use extsort::ExternalSorter;
-use itertools::Itertools;
+use itertools::{Itertools, iproduct};
 use log::warn;
 // Do not remove, it's used for tee()
 use pyo3::{create_exception, prelude::*};
-use rayon::prelude::{IntoParallelRefIterator, IntoParallelIterator, ParallelIterator, IndexedParallelIterator};
+use rayon::prelude::{IntoParallelIterator, ParallelIterator, IntoParallelRefIterator, IndexedParallelIterator};
+use std::convert::TryInto;
 use std::fs;
 use std::time::Instant;
 
@@ -144,7 +145,28 @@ impl Analysis {
     where
         J::IntoIter: Clone,
     {
-        i.cartesian_product(j.into_iter())
+        i.cartesian_product(j)
+        //i.cartesian_product(j.into_iter())
+    }
+
+    fn cartesian_product_par<X: Clone + Send + Sync, Y: Clone + Send + Sync>(
+        &self,
+        x: Vec<X>,
+        y: Vec<Y>
+    ) -> Vec<(X, Y)> {
+        let it_x = x.par_iter();
+        let it_y = y.into_iter();
+
+        let r0 = it_x
+        .flat_map(|xi| {
+            self.cartesian_product_elem(xi, it_y.clone())
+        }).collect::<Vec<_>>();
+
+        r0
+    }
+
+    fn cartesian_product_elem<X: Clone, Y>(&self, xi: &X, y: impl Iterator<Item = Y>) -> Vec<(X,Y)> {
+        y.map(|yi| { (xi.clone(), yi) }).collect_vec()
     }
 
     fn run_etapa1(
@@ -165,23 +187,26 @@ impl Analysis {
 
         let mut nan_errors = ConstantInputError::new();
 
+        let d1: Vec<TupleExpressionValues> = dataset_1.lazy_matrix.collect_vec();
+        let d2: Vec<TupleExpressionValues> = dataset_2.lazy_matrix.collect_vec();
+        let cross_product = self.cartesian_product_par(d1, d2);
+
+        /* 
         // Right part of iproduct must implement Clone. For more info read:
         // https://users.rust-lang.org/t/iterators-over-csv-files-with-iproduct/51947
         let cross_product: Box<dyn Iterator<Item = (TupleExpressionValues, TupleExpressionValues)>,> = 
         if should_collect_gem_dataset {
-            Box::new(self.cartesian_product(
-                dataset_1.lazy_matrix,
-                dataset_2.lazy_matrix.collect::<CollectedMatrix>(),
-            ))
+            Box::new(iproduct!(dataset_1.lazy_matrix, dataset_2.lazy_matrix.collect::<CollectedMatrix>()))
         } else {
-            Box::new(self.cartesian_product(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
-        };
+            Box::new(iproduct!(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
+        }; */
 
-        let items = cross_product.collect_vec();
-        let cross_product = items.into_par_iter();
+        //let items = cross_product.collect_vec();
 
         // This is the main CPU-Bound function
-        let correlations_and_p_values = cross_product.map(|(t1, t2)| {
+        let correlations_and_p_values = cross_product
+        .into_par_iter()
+        .map(|(t1, t2)| {
             correlation_function(t1, t2, &*correlation_method_struct)
         });
 
@@ -294,6 +319,9 @@ impl Analysis {
         let result = limited.collect::<VecOfResults>();
 
         println!("dt1 = {} ms; dt2 = {} ms", t1, t2 - t1);
+
+        // TEST
+        //self.cartesian_product_par(vec![1,2], vec![3,4]);
 
         Ok((
             result,
