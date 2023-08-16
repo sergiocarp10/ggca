@@ -6,12 +6,11 @@ use crate::{
     correlation::{get_correlation_method, CorResult, Correlation, CorrelationMethod},
 };
 use extsort::ExternalSorter;
-use itertools::{Itertools, iproduct};
+use itertools::Itertools;
 use log::warn;
 // Do not remove, it's used for tee()
 use pyo3::{create_exception, prelude::*};
-use rayon::prelude::{IntoParallelIterator, ParallelIterator, IntoParallelRefIterator, IndexedParallelIterator};
-use std::convert::TryInto;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator, IntoParallelRefIterator};
 use std::fs;
 use std::time::Instant;
 
@@ -187,8 +186,8 @@ impl Analysis {
 
         let mut nan_errors = ConstantInputError::new();
 
-        let d1: Vec<TupleExpressionValues> = dataset_1.lazy_matrix.collect_vec();
-        let d2: Vec<TupleExpressionValues> = dataset_2.lazy_matrix.collect_vec();
+        let d1: CollectedMatrix = dataset_1.lazy_matrix.collect_vec();
+        let d2: CollectedMatrix = dataset_2.lazy_matrix.collect_vec();
         let cross_product = self.cartesian_product_par(d1, d2);
 
         /* 

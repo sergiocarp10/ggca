@@ -53,7 +53,7 @@ fn do_analysis(dataset_chosen: &DatasetData, adj_method: AdjustmentMethod) -> Py
         gene_file_path,
         gem_file_path,
         gem_contains_cpg,
-        correlation_method: CorrelationMethod::Pearson,
+        correlation_method: CorrelationMethod::Kendall,
         correlation_threshold: 0.6,
         sort_buf_size: 2_000_000,
         adjustment_method: adj_method,
