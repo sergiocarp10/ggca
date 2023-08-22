@@ -190,8 +190,8 @@ impl Analysis {
         // UNCOMMENT FOR OPT-2
         //let d1: CollectedMatrix = dataset_1.lazy_matrix.collect_vec();
         //let d2: CollectedMatrix = dataset_2.lazy_matrix.collect_vec();
-        //let cross_product = self.cartesian_product_par(d1, d2);
- 
+        //let cross_product = self.cartesian_product_par(d1, d2).into_par_iter();
+  
         // Right part of iproduct must implement Clone. For more info read:
         // https://users.rust-lang.org/t/iterators-over-csv-files-with-iproduct/51947
         let cross_product: Box<dyn Iterator<Item = (TupleExpressionValues, TupleExpressionValues)>,> = 

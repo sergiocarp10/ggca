@@ -15,6 +15,8 @@ use std::{
     io::{Read, Write},
 };
 
+use crate::par_kendalls;
+
 /// Represents an correlation analysis result. Includes Gene, GEM, CpG Site ID (if specified) correlation statistic,
 /// p-value and adjusted p-value.
 #[pyclass(module = "ggca")]
@@ -243,10 +245,17 @@ impl Kendall {
 
 impl Correlation for Kendall {
     fn correlate(&self, x: &[f64], y: &[f64]) -> (f64, f64) {
+
+        // par kendalls
+        let (tau, significance) = par_kendalls::tau_b_with_comparator(x, y, |a, b| {
+            a.partial_cmp(b).unwrap_or(Ordering::Greater)
+        }).unwrap();
+
+        /* 
+        // sequential kendalls
         let (tau, significance) = kendalls::tau_b_with_comparator(x, y, |a: &f64, b: &f64| {
             a.partial_cmp(b).unwrap_or(Ordering::Greater)
-        })
-        .unwrap();
+        }).unwrap(); */
 
         // P-value (two-sided)
         let cdf = gaussian_P(-significance.abs(), 1.0);
