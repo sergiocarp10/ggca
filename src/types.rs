@@ -8,4 +8,4 @@ pub type CollectedMatrix = Vec<TupleExpressionValues>;
 
 
 // New types
-pub type FilteredResults<'a> = Box<dyn Iterator<Item = CorResult> + 'a>;
+pub type FilteredResults = Box<dyn Iterator<Item = CorResult>>;

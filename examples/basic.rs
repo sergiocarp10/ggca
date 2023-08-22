@@ -47,7 +47,7 @@ fn do_analysis(dataset_chosen: &DatasetData, adj_method: AdjustmentMethod) -> Py
     let is_all_vs_all = true;
     let keep_top_n = Some(10);
     let collect_gem_dataset = Some(true);  // false = disk (slow), true = ram, or none
-    let cor_method = CorrelationMethod::Spearman;
+    let cor_method = CorrelationMethod::Kendall;
 
     // Creates and run an analysis
     let analysis = Analysis {

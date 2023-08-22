@@ -170,13 +170,13 @@ impl Analysis {
         y.map(|yi| { (xi.clone(), yi) }).collect_vec()
     }
 
-    fn run_etapa1<'a>(
-        &'a self, 
+    fn run_etapa1(
+        &self, 
         should_collect_gem_dataset: bool, 
         dataset_1: Dataset, 
         dataset_2: Dataset,
         number_of_samples: usize,
-        nan_errors: &'a ConstantInputError
+        nan_errors: &ConstantInputError
     ) -> FilteredResults {
         let correlation_function = if self.is_all_vs_all {
             cartesian_all_vs_all
@@ -201,30 +201,25 @@ impl Analysis {
             Box::new(iproduct!(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
         };
         
-        //let cross_product = cross_product.collect_vec();
+        let cross_product = cross_product.collect_vec().into_par_iter();
 
         // This is the main CPU-Bound function
-        let correlations_and_p_values = cross_product
-        //.into_par_iter()
-        .map(move |(t1, t2)| {
+        let correlations_and_p_values = cross_product.map(|(t1, t2)| {
             correlation_function(t1, t2, &*correlation_method_struct)
         });
 
-        //let items: Vec<CorResult> = correlations_and_p_values.collect();
-        //let correlations_and_p_values = items.into_iter();
-
-        let filtered: FilteredResults = if self.is_all_vs_all {
+        let filtered: Box<VecOfResults> = if self.is_all_vs_all {
             let filtered_nan = correlations_and_p_values
-                .filter(move |cor_result| !nan_errors.p_value_is_nan(cor_result));
-            Box::new(filtered_nan)
+                .filter(|cor_result| !nan_errors.p_value_is_nan(cor_result));
+            Box::new(filtered_nan.collect())
         } else {
-            let filtered_nan = correlations_and_p_values.filter(move |cor_result| {
+            let filtered_nan = correlations_and_p_values.filter(|cor_result| {
                 cor_result.gene == cor_result.gem && !nan_errors.p_value_is_nan(cor_result)
             });
-            Box::new(filtered_nan)
+            Box::new(filtered_nan.collect())
         };
 
-        filtered
+        Box::new(filtered.into_iter())
     }
 
     fn run_analysis(
