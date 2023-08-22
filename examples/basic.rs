@@ -47,21 +47,23 @@ fn do_analysis(dataset_chosen: &DatasetData, adj_method: AdjustmentMethod) -> Py
     let is_all_vs_all = true;
     let keep_top_n = Some(10);
     let collect_gem_dataset = Some(true);  // false = disk (slow), true = ram, or none
+    let cor_method = CorrelationMethod::Spearman;
 
     // Creates and run an analysis
     let analysis = Analysis {
         gene_file_path,
         gem_file_path,
         gem_contains_cpg,
-        correlation_method: CorrelationMethod::Kendall,
+        correlation_method: cor_method.clone(),
         correlation_threshold: 0.6,
         sort_buf_size: 2_000_000,
-        adjustment_method: adj_method,
+        adjustment_method: adj_method.clone(),
         is_all_vs_all,
         collect_gem_dataset,
         keep_top_n
     };
 
+    println!("Testing for {:?}, {:?}", cor_method.to_string(), adj_method.to_string());
     let now = Instant::now();
 
     let (mut result, mut _total_combinations_count, mut number_of_combinations_evaluated) = (vec![], 0, 0);
@@ -88,6 +90,8 @@ fn do_analysis(dataset_chosen: &DatasetData, adj_method: AdjustmentMethod) -> Py
         result.len(),
         number_of_combinations_evaluated
     );
+
+    println!();
 
     Ok(())
 }

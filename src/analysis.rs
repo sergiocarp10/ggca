@@ -170,13 +170,13 @@ impl Analysis {
         y.map(|yi| { (xi.clone(), yi) }).collect_vec()
     }
 
-    fn run_etapa1(
-        &self, 
+    fn run_etapa1<'a>(
+        &'a self, 
         should_collect_gem_dataset: bool, 
         dataset_1: Dataset, 
         dataset_2: Dataset,
         number_of_samples: usize,
-        nan_errors: &ConstantInputError
+        nan_errors: &'a ConstantInputError
     ) -> FilteredResults {
         let correlation_function = if self.is_all_vs_all {
             cartesian_all_vs_all
@@ -188,11 +188,10 @@ impl Analysis {
         let correlation_method_struct = get_correlation_method(&self.correlation_method, number_of_samples);
 
         // UNCOMMENT FOR OPT-2
-        let d1: CollectedMatrix = dataset_1.lazy_matrix.collect_vec();
-        let d2: CollectedMatrix = dataset_2.lazy_matrix.collect_vec();
-        let cross_product = self.cartesian_product_par(d1, d2);
-
-        /* 
+        //let d1: CollectedMatrix = dataset_1.lazy_matrix.collect_vec();
+        //let d2: CollectedMatrix = dataset_2.lazy_matrix.collect_vec();
+        //let cross_product = self.cartesian_product_par(d1, d2);
+ 
         // Right part of iproduct must implement Clone. For more info read:
         // https://users.rust-lang.org/t/iterators-over-csv-files-with-iproduct/51947
         let cross_product: Box<dyn Iterator<Item = (TupleExpressionValues, TupleExpressionValues)>,> = 
@@ -201,30 +200,31 @@ impl Analysis {
         } else {
             Box::new(iproduct!(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
         };
-        let cross_product = cross_product.collect_vec(); */
+        
+        //let cross_product = cross_product.collect_vec();
 
         // This is the main CPU-Bound function
         let correlations_and_p_values = cross_product
-        .into_par_iter()
-        .map(|(t1, t2)| {
+        //.into_par_iter()
+        .map(move |(t1, t2)| {
             correlation_function(t1, t2, &*correlation_method_struct)
         });
 
         //let items: Vec<CorResult> = correlations_and_p_values.collect();
         //let correlations_and_p_values = items.into_iter();
 
-        let filtered: Box<VecOfResults> = if self.is_all_vs_all {
+        let filtered: FilteredResults = if self.is_all_vs_all {
             let filtered_nan = correlations_and_p_values
                 .filter(move |cor_result| !nan_errors.p_value_is_nan(cor_result));
-            Box::new(filtered_nan.collect())
+            Box::new(filtered_nan)
         } else {
             let filtered_nan = correlations_and_p_values.filter(move |cor_result| {
                 cor_result.gene == cor_result.gem && !nan_errors.p_value_is_nan(cor_result)
             });
-            Box::new(filtered_nan.collect())
+            Box::new(filtered_nan)
         };
 
-        Box::new(filtered.into_iter())
+        filtered
     }
 
     fn run_analysis(
