@@ -113,6 +113,7 @@ pub mod analysis;
 pub mod correlation;
 pub mod dataset;
 pub mod types;
+pub mod par_kendalls;
 
 use adjustment::AdjustmentMethod;
 use analysis::{Analysis, GGCADiffSamples, GGCADiffSamplesLength};
