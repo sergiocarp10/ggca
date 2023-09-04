@@ -14,10 +14,7 @@ fn pairs_comparator(a: &f64, b: &f64) -> Ordering {
 /// The same as `tau_b` but also allow to specify custom comparator for numbers for
 /// which [Ord] trait is not defined.
 #[allow(clippy::many_single_char_names)]
-pub fn tau_b_with_comparator<F>(x: &[f64], y: &[f64], mut comparator: F) -> Result<(f64, f64), Error>
-where
-    F: FnMut(&f64, &f64) -> Ordering,
-{
+pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> {
     if x.len() != y.len() {
         return Err(Error::DimensionMismatch {
             expected: x.len(),
@@ -104,7 +101,7 @@ where
                     if j < j_end {
                         let a = &pairs[i].1;
                         let b = &pairs[j].1;
-                        if comparator(a, b) == Ordering::Greater {
+                        if pairs_comparator(a, b) == Ordering::Greater {
                             pairs_dest[copy_location] = pairs[j].clone();
                             j += 1;
                             swaps += i_end - i;
