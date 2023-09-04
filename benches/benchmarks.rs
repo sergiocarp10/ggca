@@ -27,8 +27,8 @@ fn bench_group(
 
     // For every correlation method
     for cor_method in [
-        CorrelationMethod::Pearson,
-        CorrelationMethod::Spearman,
+        //CorrelationMethod::Pearson,
+        //CorrelationMethod::Spearman,
         CorrelationMethod::Kendall,
     ] {
         // Tests some important thresholds
@@ -97,14 +97,14 @@ fn bench_group(
 
 pub fn ggca_benchmarks(c: &mut Criterion) {
     // Test small files without CpG Site IDs
-    let mut group_small = c.benchmark_group("Small mRNA/miRNA files");
+    /* let mut group_small = c.benchmark_group("Small mRNA/miRNA files");
     bench_group(
         GENE_SMALL_FILE_PATH,
         GEM_SMALL_FILE_PATH,
         false,
         &mut group_small,
     );
-    group_small.finish();
+    group_small.finish(); */
 
     // Test small files with CpG Site IDs
     let mut group_methylation = c.benchmark_group("Small mRNA/Methy. (CpG) files");

@@ -170,7 +170,7 @@ impl Sortable for CorResult {
     }
 }
 
-pub trait Correlation {
+pub trait Correlation: Sync {
     fn correlate(&self, x: &[f64], y: &[f64]) -> (f64, f64);
 }
 
