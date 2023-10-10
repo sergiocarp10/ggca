@@ -180,7 +180,7 @@ create_exception!(ggca, InvalidAdjustmentMethod, pyo3::exceptions::PyException);
             adjustment_method,
             is_all_vs_all,
             collect_gem_dataset,
-            keep_top_n,
+            keep_top_n
         };
 
         analysis.compute()
