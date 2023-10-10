@@ -5,12 +5,14 @@ use pyo3::PyResult;
 use std::time::Instant;
 
 fn main() -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+
     // Datasets's paths
-    let gene_file_path = "mrna.csv".to_string();
-    let gem_file_path = "mirna.csv".to_string();
+    let gene_file_path = "tests/medium_files/methylation_gene.csv".to_string();
+    let gem_file_path = "tests/medium_files/methylation_gem.csv".to_string();
 
     // Some parameters
-    let gem_contains_cpg = false;
+    let gem_contains_cpg = true;
     let is_all_vs_all = true;
     let keep_top_n = Some(10); // Keeps the top 10 of correlation (sorting by abs values)
     let collect_gem_dataset = None; // Better performance. Keep small GEM files in memory
@@ -22,7 +24,7 @@ fn main() -> PyResult<()> {
         gene_file_path,
         gem_file_path,
         gem_contains_cpg,
-        correlation_method: CorrelationMethod::Pearson,
+        correlation_method: CorrelationMethod::Spearman,
         correlation_threshold: 0.7,
         sort_buf_size: 2_000_000,
         adjustment_method: AdjustmentMethod::BenjaminiHochberg,
