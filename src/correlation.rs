@@ -9,11 +9,12 @@ use rgsl::{
     statistics::{correlation, spearman},
 };
 use serde_derive::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::{
     fmt::Debug,
     io::{Read, Write},
 };
+
+use crate::kendalls_opt::tau_b_with_comparator;
 
 /// Represents an correlation analysis result. Includes Gene, GEM, CpG Site ID (if specified) correlation statistic,
 /// p-value and adjusted p-value.
@@ -243,10 +244,7 @@ impl Kendall {
 
 impl Correlation for Kendall {
     fn correlate(&self, x: &[f64], y: &[f64]) -> (f64, f64) {
-        let (tau, significance) = kendalls::tau_b_with_comparator(x, y, |a: &f64, b: &f64| {
-            a.partial_cmp(b).unwrap_or(Ordering::Greater)
-        })
-        .unwrap();
+        let (tau, significance) = tau_b_with_comparator(x, y).unwrap();
 
         // P-value (two-sided)
         let cdf = gaussian_P(-significance.abs(), 1.0);
