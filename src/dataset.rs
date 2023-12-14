@@ -4,8 +4,6 @@ use pyo3::create_exception;
 use pyo3::PyResult;
 use std::fs::File;
 
-#[global_allocator]
-static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 create_exception!(ggca, GGCAError, pyo3::exceptions::PyException);
 

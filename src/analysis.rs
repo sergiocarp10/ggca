@@ -10,7 +10,7 @@ use itertools::Itertools;
 use log::warn;
 // Do not remove, it's used for tee()
 use pyo3::{create_exception, prelude::*};
-use rayon::iter::{ParallelBridge, ParallelIterator, IntoParallelIterator};
+use rayon::iter::{ParallelBridge, ParallelIterator, IntoParallelIterator, IntoParallelRefIterator};
 use std::fs;
 use std::sync::Mutex;
 
@@ -167,17 +167,22 @@ impl Analysis {
         // https://users.rust-lang.org/t/iterators-over-csv-files-with-iproduct/51947
         let d1_vec = dataset_1.lazy_matrix.collect_vec();
         let d2_vec = dataset_2.lazy_matrix.collect_vec(); 
-
-        let cross_product = d1_vec.into_par_iter().map(|x| {
+        
+        let correlations_and_p_values = d1_vec.into_par_iter().map(|x| {
             d2_vec.clone().into_iter().map(|y| {
                 (x.clone(), y)
+            }).map(|(t1, t2)| {
+                correlation_function(t1, t2, &*correlation_method_struct)
             }).collect_vec()
         }).flatten();
+        
 
         /* 
         let cross_product: Box<
             dyn Iterator<Item = (TupleExpressionValues, TupleExpressionValues)>,
         > = if should_collect_gem_dataset {
+            println!("Producto cartesiano en RAM...");
+            
             Box::new(self.cartesian_product(
                 dataset_1.lazy_matrix,
                 dataset_2.lazy_matrix.collect::<CollectedMatrix>(),
@@ -186,9 +191,14 @@ impl Analysis {
             Box::new(self.cartesian_product(dataset_1.lazy_matrix, dataset_2.lazy_matrix))
         }; */
 
+        //let vec = cross_product.collect_vec();
+        //println!("Vec collected for Prop 2...");
+
+        /*
         let correlations_and_p_values = cross_product.map(|(tuple_1, tuple_2)| {
+            println!("Mapping...");
             correlation_function(tuple_1, tuple_2, &*correlation_method_struct)
-        });
+        });  */
 
         // Filtering by equal genes (if needed) and NaN values
         let nan_errors = ConstantInputError::new();
