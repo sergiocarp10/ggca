@@ -316,6 +316,7 @@ dependencies = [
  "extsort",
  "fast-float",
  "itertools 0.9.0",
+ "jemalloc",
  "kendalls",
  "lazy_static",
  "log",
@@ -409,6 +410,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
 
 [[package]]
+name = "jemalloc"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd5927dc2630919333682c1757ed2d1518f510336096d0f43f0426a0f776f8e6"
+dependencies = [
+ "loca",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -434,6 +444,15 @@ name = "libc"
 version = "0.2.117"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e74d72e0f9b65b5b4ca49a346af3976df0f9c61d550727f349ecd559f251a26c"
+
+[[package]]
+name = "loca"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "669389264b730a98e0d11713d0260f0ab363ad7e50ffc6d36db9c75bb7a5e527"
+dependencies = [
+ "ptr",
+]
 
 [[package]]
 name = "lock_api"
@@ -593,6 +612,12 @@ checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
 dependencies = [
  "unicode-xid",
 ]
+
+[[package]]
+name = "ptr"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76208293e44a44a702aa22f5cf40e2e55f4a6cd19953ddadb0b3f68e337d87ce"
 
 [[package]]
 name = "pulldown-cmark"
