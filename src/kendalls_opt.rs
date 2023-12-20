@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use itertools::Itertools;
 use kendalls::Error;
+use rayon::slice::ParallelSliceMut;
 
 fn pairs_comparator(a: &f64, b: &f64) -> Ordering {
     a.partial_cmp(b).unwrap_or(Ordering::Greater)
@@ -25,7 +26,7 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
 
     let mut pairs = x.iter().cloned().zip(y.iter().cloned()).collect_vec();
 
-    pairs.sort_by(|pair1, pair2| {
+    pairs.par_sort_by(|pair1, pair2| {
         let res = pairs_comparator(&pair1.0, &pair2.0);
         if res == Ordering::Equal {
             pairs_comparator(&pair1.1, &pair2.1)
