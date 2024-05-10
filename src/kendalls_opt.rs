@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use itertools::Itertools;
 use kendalls::Error;
 use rayon::slice::ParallelSliceMut;
 
@@ -6,8 +7,10 @@ fn pairs_comparator(a: &f64, b: &f64) -> Ordering {
     a.partial_cmp(b).unwrap_or(Ordering::Greater)
 }
 
+/// The same as `tau_b` but also allow to specify custom comparator for numbers for
+/// which [Ord] trait is not defined.
+#[allow(clippy::many_single_char_names)]
 pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> {
-
     if x.len() != y.len() {
         return Err(Error::DimensionMismatch {
             expected: x.len(),
@@ -21,7 +24,7 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
 
     let n = x.len();
 
-    let mut pairs: Vec<(f64, f64)> = x.iter().cloned().zip(y.iter().cloned()).collect();
+    let mut pairs = x.iter().cloned().zip(y.iter().cloned()).collect_vec();
 
     pairs.par_sort_by(|pair1, pair2| {
         let res = pairs_comparator(&pair1.0, &pair2.0);
@@ -34,6 +37,7 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
 
     let mut v1_part_1 = 0usize;
     let mut v2_part_1 = 0isize;
+
     let mut tied_x_pairs = 0usize;
     let mut tied_xy_pairs = 0usize;
     let mut vt = 0usize;
@@ -43,7 +47,6 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
     for i in 1..n {
         let prev = &pairs[i - 1];
         let curr = &pairs[i];
-
         if curr.0 == prev.0 {
             consecutive_x_ties += 1;
             if curr.1 == prev.1 {
@@ -78,9 +81,9 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
     );
 
     let mut swaps = 0usize;
-    let mut pairs_dest: Vec<(f64, f64)> = vec![(0.0, 0.0); n];
-    let mut segment_size = 1usize;
+    let mut pairs_dest: Vec<(f64, f64)> = vec![(Default::default(), Default::default()); n];
 
+    let mut segment_size = 1usize;
     while segment_size < n {
         for offset in (0..n).step_by(2 * segment_size) {
             let mut i = offset;
@@ -89,28 +92,32 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
             let j_end = n.min(j + segment_size);
             let mut copy_location = offset;
 
-            while i < i_end || j < j_end {
-                if i < i_end {
-                    if j < j_end {
-                        let a = &pairs[i].1;
-                        let b = &pairs[j].1;
-                        if pairs_comparator(a, b) == Ordering::Greater {
-                            pairs_dest[copy_location] = pairs[j].clone();
-                            j += 1;
-                            swaps += i_end - i;
-                        } else {
-                            pairs_dest[copy_location] = pairs[i].clone();
-                            i += 1;
-                        }
-                    } else {
-                        pairs_dest[copy_location] = pairs[i].clone();
-                        i += 1;
-                    }
-                } else {
+            while i < i_end && j < j_end {
+                let a = &pairs[i].1;
+                let b = &pairs[j].1;
+                
+                if pairs_comparator(a, b) == Ordering::Greater {
                     pairs_dest[copy_location] = pairs[j].clone();
                     j += 1;
+                    swaps += i_end - i;
+                } else {
+                    pairs_dest[copy_location] = pairs[i].clone();
+                    i += 1;
                 }
+
                 copy_location += 1;
+            }
+
+            while i < i_end {
+                pairs_dest[copy_location] = pairs[i].clone();
+                i += 1;
+                copy_location += 1
+            }
+
+            while j < j_end {
+                pairs_dest[copy_location] = pairs[j].clone();
+                j += 1;
+                copy_location += 1
             }
         }
 
@@ -128,7 +135,6 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
     for j in 1..n {
         let prev = &pairs[j - 1];
         let curr = &pairs[j];
-
         if curr.1 == prev.1 {
             consecutive_y_ties += 1;
         } else {
@@ -162,8 +168,16 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
     let tied_xy_pairs_f: f64 = tied_xy_pairs as f64;
     let swaps_f: f64 = (2 * swaps) as f64;
 
-    let concordant_minus_discordant = num_pairs_f - tied_x_pairs_f - tied_y_pairs_f + tied_xy_pairs_f - swaps_f;
+    // Note that tot = con + dis + (xtie - ntie) + (ytie - ntie) + ntie
+    //               = con + dis + xtie + ytie - ntie
+    //
+    //           C-D = tot - xtie - ytie + ntie - 2 * dis
+    let concordant_minus_discordant =
+        num_pairs_f - tied_x_pairs_f - tied_y_pairs_f + tied_xy_pairs_f - swaps_f;
+
+    // non_tied_pairs_multiplied = ((n0 - n1) * (n0 - n2)).sqrt()
     let non_tied_pairs_multiplied = (num_pairs_f - tied_x_pairs_f) * (num_pairs_f - tied_y_pairs_f);
+
     let tau_b = concordant_minus_discordant / non_tied_pairs_multiplied.sqrt();
 
     // Significance
@@ -182,10 +196,7 @@ pub fn tau_b_with_comparator(x: &[f64], y: &[f64]) -> Result<(f64, f64), Error> 
 
     // Limit range to fix computational errors
     Ok((tau_b.max(-1.0).min(1.0), z))
-
 }
-
-// Copied from Kendalls Lib
 
 #[inline]
 fn sum(n: usize) -> usize {
