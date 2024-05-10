@@ -6,7 +6,7 @@ use pyo3::ToPyObject;
 use rgsl::randist::gaussian::gaussian_P;
 use rgsl::{
     randist::t_distribution::{tdist_P, tdist_Q},
-    statistics::{correlation, spearman},
+    statistics::spearman,
 };
 use serde_derive::{Deserialize, Serialize};
 use std::{
@@ -191,7 +191,31 @@ impl Pearson {
 
 impl Correlation for Pearson {
     fn correlate(&self, x: &[f64], y: &[f64]) -> (f64, f64) {
-        let r = correlation(x, 1, y, 1, self.n);
+        let mut x_sum: f64 = 0.0;
+        let mut y_sum: f64 = 0.0;
+
+        for i in 0..self.n {
+            x_sum += x[i];
+            y_sum += y[i];
+        }
+
+        let x_avg = x_sum / self.n as f64;
+        let y_avg = y_sum / self.n as f64;
+
+        let mut numerador: f64 = 0.0;
+        let mut den_1: f64 = 0.0;
+        let mut den_2: f64 = 0.0;
+
+        for i in 0..self.n {
+            let diff_x = x[i] - x_avg;
+            let diff_y = y[i] - y_avg;
+            
+            numerador += diff_x * diff_y;
+            den_1 += diff_x.powi(2);
+            den_2 += diff_y.powi(2);
+        }
+
+        let r = numerador / (den_1 * den_2).sqrt();
 
         // P-value (two-sided)
         // Based on R's cor.test method (https://github.com/SurajGupta/r-source/blob/a28e609e72ed7c47f6ddfbb86c85279a0750f0b7/src/library/stats/R/cor.test.R#L21)
