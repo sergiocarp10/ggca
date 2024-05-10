@@ -189,7 +189,7 @@ impl Analysis {
             _ => {
                 // Benjamini-Hochberg and Benjamini-Yekutieli needs sort by p-value (descending order) to
                 // make the adjustment
-                let sorter = ExternalSorter::new().with_segment_size(self.sort_buf_size as usize);
+                let sorter = ExternalSorter::new().with_parallel_sort().with_segment_size(self.sort_buf_size as usize);
                 Box::new(sorter.sort_by(filtered, |result_1, result_2| {
                     result_2
                         .p_value
@@ -233,7 +233,7 @@ impl Analysis {
 
                     // Sorts by correlation in descending order
                     let sorter =
-                        ExternalSorter::new().with_segment_size(self.sort_buf_size as usize);
+                        ExternalSorter::new().with_parallel_sort().with_segment_size(self.sort_buf_size as usize);
                     let sorted_cor_desc =
                         sorter.sort_by(filtered, |combination_1, combination_2| {
                             // Unwrap is safe as correlation values are all valid in this stage of algorithm (None
