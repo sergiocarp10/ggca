@@ -8,6 +8,9 @@ use std::fs::File;
 
 create_exception!(ggca, GGCAError, pyo3::exceptions::PyException);
 
+#[global_allocator]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 /// Creates CSV Reader from a path with the Tab delimiter
 /// # Args
 /// * `path`: Path of file to create the Reader
