@@ -2,8 +2,6 @@ use crate::types::{LazyMatrixInner, TupleExpressionValues};
 use csv::{Reader, ReaderBuilder};
 use pyo3::create_exception;
 use pyo3::PyResult;
-use rayon::iter::ParallelBridge;
-use rayon::iter::ParallelIterator;
 use std::fs::File;
 
 create_exception!(ggca, GGCAError, pyo3::exceptions::PyException);
@@ -62,7 +60,7 @@ impl LazyMatrix {
         // Build the CSV reader and iterate over each record.
         let reader = reader_from_path(path)?;
 
-        let res_lazy_matrix = reader.into_records().par_bridge().map(move |record_result| {
+        let res_lazy_matrix = reader.into_records().map(move |record_result| {
             // Gets current record and its line
             let record = record_result.unwrap();
             let line = record.position().unwrap().line();
@@ -98,8 +96,7 @@ impl LazyMatrix {
             (gene_or_gem, cpg_site_id, values)
         });
 
-        let aux = res_lazy_matrix.collect::<Vec<_>>();
-        Ok(Box::new(aux.into_iter()))
+        Ok(Box::new(res_lazy_matrix))
     }
 }
 
